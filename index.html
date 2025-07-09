@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>2D Sword Game</title>
+  <style>
+    body {
+      margin: 0;
+      background: #111;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      background: #222;
+      box-shadow: 0 0 20px red;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game" width="800" height="500"></canvas>
+  <script>
+      const canvas = document.getElementById('game');
+      const ctx = canvas.getContext("2d");
+      
+      const player = {
+          x: 400,
+          y: 250, 
+          size: 30,
+          color: 'lime',
+          speed: 5
+      }
+      let swordVisible = false;
+      let facing = "right"
+      let swordTimer = 0
+      let swingAngle = 0
+      let health = 100;
+      let score = 0;
+      let gameOver = false;
+      
+      const keys = {}
+      const trees = [];
+      const grass = [];
+      const enemies = [];
+      let enemySpawnTimer = 0;
+
+      
+      function initBackground() {
+          // Ağaclar
+          for (let i = 0; i < 6; i++) {
+            trees.push({
+              x: Math.random() * (canvas.width - 40),
+              y: Math.random() * (canvas.height - 100) + 50
+            });
+          }
+        
+          // Otlar və yarpaqlar
+          for (let i = 0; i < 7; i++) {
+            grass.push({
+              x: Math.random() * canvas.width,
+              y: Math.random() * canvas.height
+            });
+          }
+      }
+
+      
+      document.addEventListener('keydown', (e)=>{
+          keys[e.key] = true
+          
+          if(e.code == "Space" && !swordVisible){
+              swordVisible = true
+              swordTimer = 20
+              swingAngle = 0
+          }
+      });
+      document.addEventListener('keyup', (e)=>{
+          keys[e.key] = false
+      });
+      
+      function movePlayer(){
+          if ((keys["ArrowUp"] || keys["w"]) && player.y > 0) {
+            player.y -= player.speed;
+            facing = "up"
+          }
+          if ((keys["ArrowDown"] || keys["s"]) && player.y + player.size < canvas.height) {
+            player.y += player.speed;
+            facing = "down"
+          }
+          if ((keys["ArrowLeft"] || keys["a"]) && player.x > 0) {
+            player.x -= player.speed;
+            facing = "left"
+          }
+        
+          if ((keys["ArrowRight"] || keys["d"]) && player.x + player.size < canvas.width) {
+            player.x += player.speed;
+            
+            facing = "right"
+          }
+      }
+      
+      function drawSword() {
+          if (!swordVisible) return;
+        
+          ctx.save();
+        
+          // Qılıncın rəngləri
+          let swordLength = 40;
+          let swordWidth = 8;
+          let handleLength = 12;
+        
+          // Oyunçunun mərkəzi mövqeyi
+          let centerX = player.x + player.size / 2;
+          let centerY = player.y + player.size / 2;
+        
+          ctx.translate(centerX, centerY);
+        
+          // Sallanma effekti - daha dramatik
+          let baseAngle = 0;
+          let swingEffect = Math.sin(swingAngle * 0.3) * 0.5;
+          
+          if (facing === "right") {
+            baseAngle = 0 + swingEffect;
+          } else if (facing === "left") {
+            baseAngle = Math.PI + swingEffect;
+          } else if (facing === "up") {
+            baseAngle = -Math.PI/2 + swingEffect;
+          } else if (facing === "down") {
+            baseAngle = Math.PI/2 + swingEffect;
+          }
+        
+          ctx.rotate(baseAngle);
+        
+          // Qılıncın sapı (qəhvəyi)
+          ctx.fillStyle = "#8B4513";
+          ctx.fillRect(-handleLength/2, -swordWidth/2, handleLength, swordWidth);
+          
+          // Qılıncın tığı (gümüşü)
+          ctx.fillStyle = "#C0C0C0";
+          ctx.fillRect(handleLength/2, -swordWidth/2, swordLength, swordWidth);
+          
+          // Qılıncın ucu (parlaq)
+          ctx.fillStyle = "#E6E6FA";
+          ctx.fillRect(handleLength/2 + swordLength - 5, -swordWidth/2, 5, swordWidth);
+          
+          // Qılıncın qoruyucusu
+          ctx.fillStyle = "#FFD700";
+          ctx.fillRect(handleLength/2 - 2, -swordWidth, 4, swordWidth * 2);
+        
+          ctx.restore();
+        
+          // Sallanma animasiyası
+          swingAngle += 0.8;
+          swordTimer--;
+          if (swordTimer <= 0) {
+            swordVisible = false;
+          }
+      }
+      
+      function drawPlayer() {
+        // Bədənin alt hissəsi (ayaqlar)
+        ctx.fillStyle = "#4169E1"; // Mavi şalvar
+        ctx.fillRect(player.x + 5, player.y + 20, 8, 10);
+        ctx.fillRect(player.x + 17, player.y + 20, 8, 10);
+        
+        // Bədənin orta hissəsi (gövdə)
+        ctx.fillStyle = "#FF6347"; // Qırmızı köynək
+        ctx.fillRect(player.x + 5, player.y + 12, 20, 12);
+        
+        // Başın arxaplan dairəsi
+        ctx.fillStyle = "#FFE4B5"; // Dəri rəngi
+        ctx.beginPath();
+        ctx.arc(player.x + 15, player.y + 8, 10, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Gözlər
+        ctx.fillStyle = "#FFFFFF";
+        ctx.beginPath();
+        ctx.arc(player.x + 11, player.y + 6, 2, 0, Math.PI * 2);
+        ctx.arc(player.x + 19, player.y + 6, 2, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Göz bəbəkləri
+        ctx.fillStyle = "#000000";
+        ctx.beginPath();
+        ctx.arc(player.x + 11, player.y + 6, 1, 0, Math.PI * 2);
+        ctx.arc(player.x + 19, player.y + 6, 1, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Burun
+        ctx.fillStyle = "#FFB6C1";
+        ctx.beginPath();
+        ctx.arc(player.x + 15, player.y + 8, 1, 0, Math.PI * 2);
+        ctx.fill();
+        
+        
+        // Ağız (gülümsəmə)
+        ctx.strokeStyle = "#000000";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(player.x + 15, player.y + 9, 3, 0, Math.PI);
+        ctx.stroke();
+        
+        // Saç (qəhvəyi)
+        ctx.fillStyle = "#8B4513";
+        ctx.beginPath();
+        ctx.arc(player.x + 15, player.y + 4, 8, Math.PI, 0);
+        ctx.fill();
+        
+        // Saç telleri
+        ctx.fillStyle = "#654321";
+        ctx.fillRect(player.x + 8, player.y + 2, 2, 6);
+        ctx.fillRect(player.x + 14, player.y + 1, 2, 7);
+        ctx.fillRect(player.x + 20, player.y + 2, 2, 6);
+        
+        // Əllər
+        ctx.fillStyle = "#FFE4B5";
+        ctx.beginPath();
+        ctx.arc(player.x + 3, player.y + 16, 2, 0, Math.PI * 2);
+        ctx.arc(player.x + 27, player.y + 16, 2, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Ayaq paltarı
+        ctx.fillStyle = "#2F4F4F";
+        ctx.fillRect(player.x + 6, player.y + 28, 6, 2);
+        ctx.fillRect(player.x + 18, player.y + 28, 6, 2);
+       }
+       
+       function drawBackground() {
+          // Fon
+          ctx.fillStyle = "#228B22";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+          // Gölməçə
+          ctx.fillStyle = "#87CEFA";
+          ctx.beginPath();
+          ctx.ellipse(600, 120, 80, 40, 0, 0, Math.PI * 2);
+          ctx.fill();
+        
+          // Ağaclar (sabit massivdən)
+          trees.forEach(tree => {
+            ctx.fillStyle = "#8B4513";
+            ctx.fillRect(tree.x + 10, tree.y, 10, 40);
+        
+            ctx.fillStyle = "#006400";
+            ctx.beginPath();
+            ctx.arc(tree.x + 15, tree.y, 25, 0, Math.PI * 2);
+            ctx.fill();
+          });
+        
+          // Otlar / yarpaqlar
+          grass.forEach(g => {
+            ctx.fillStyle = "#32CD32";
+            ctx.beginPath();
+            ctx.arc(g.x, g.y, 4, 0, Math.PI * 2);
+            ctx.fill();
+          });
+        }
+    
+    function spawnEnemy() {
+      const edgePadding = 50;
+      const sides = ["top", "bottom", "left", "right"];
+      const side = sides[Math.floor(Math.random() * sides.length)];
+    
+      let x, y;
+    
+      if (side === "top") {
+        x = Math.random() * canvas.width;
+        y = -edgePadding;
+      } else if (side === "bottom") {
+        x = Math.random() * canvas.width;
+        y = canvas.height + edgePadding;
+      } else if (side === "left") {
+        x = -edgePadding;
+        y = Math.random() * canvas.height;
+      } else if (side === "right") {
+        x = canvas.width + edgePadding;
+        y = Math.random() * canvas.height;
+      }
+    
+      enemies.push({ x, y, size: 25, speed: 2.3, color: "#8B0000" });
+    }
+    
+    function updateEnemies() {
+     enemies.forEach((enemy, index) => {
+        const dx = player.x - enemy.x;
+        const dy = player.y - enemy.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const moveX = (dx / dist) * enemy.speed;
+        const moveY = (dy / dist) * enemy.speed;
+    
+        enemy.x += moveX;
+        enemy.y += moveY;
+    
+        // Qılınc zərbəsi → düşmən ölsün, score artsın
+        if (swordVisible && checkSwordHit(enemy)) {
+          enemies.splice(index, 1);
+          score += 10; // 🏆
+          return;
+        }
+    
+        // Düşmən oyunçuya dəyirsə → can azalsın
+        const playerCenterX = player.x + player.size / 2;
+        const playerCenterY = player.y + player.size / 2;
+        const distanceToPlayer = Math.sqrt(
+          (enemy.x - playerCenterX) ** 2 + (enemy.y - playerCenterY) ** 2
+        );
+    
+        if (distanceToPlayer < (enemy.size + player.size) / 2) {
+          health -= 10;
+          enemies.splice(index, 1); // düşmən yox olsun
+        }
+      });
+    
+      // Çək
+      enemies.forEach(enemy => {
+        ctx.fillStyle = enemy.color;
+        ctx.beginPath();
+        ctx.arc(enemy.x, enemy.y, enemy.size / 2, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
+    
+    function checkSwordHit(enemy) {
+        const swordRange = 50;
+        const px = player.x + player.size / 2;
+        const py = player.y + player.size / 2;
+
+        const dx = enemy.x - px;
+        const dy = enemy.y - py;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        return distance < swordRange;
+    }
+    
+    function drawUI() {
+      ctx.fillStyle = "white";
+      ctx.font = "18px Arial";
+      ctx.fillText("❤️ Health: " + health, 20, 30);
+      ctx.fillText("🏆 Score: " + score, 20, 60);
+    
+      if (gameOver) {
+        ctx.fillStyle = "red";
+        ctx.font = "48px Arial";
+        ctx.fillText("GAME OVER", canvas.width / 2 - 140, canvas.height / 2);
+      }
+    }
+
+
+
+
+
+       
+      function gameLoop() {
+          if (gameOver) {
+            drawUI();
+            return;
+          }
+        
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          drawBackground(); 
+          movePlayer();
+          drawPlayer();
+          drawSword();
+        
+          enemySpawnTimer++;
+          if (enemySpawnTimer > 60) {
+            spawnEnemy();
+            enemySpawnTimer = 0;
+          }
+        
+          updateEnemies();
+          drawUI();
+        
+          if (health <= 0) {
+            gameOver = true;
+          }
+        
+          requestAnimationFrame(gameLoop);
+        }
+
+    initBackground();
+    gameLoop();
+  </script>
+</body>
+</html>
